@@ -123,6 +123,7 @@ UPROGS=\
 	$U/_init\
 	$U/_kill\
 	$U/_ln\
+	$U/_uptime\
 	$U/_ls\
 	$U/_mkdir\
 	$U/_rm\

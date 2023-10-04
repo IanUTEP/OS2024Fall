@@ -1,6 +1,6 @@
 struct stat;
 struct rtcdate;
-
+struct rusage;
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -17,12 +17,17 @@ int unlink(const char*);
 int fstat(int fd, struct stat*);
 int link(const char*, const char*);
 int mkdir(const char*);
+int time1(const char*);
+int time(const char*);
+int sleep(int);
+int matmul(const char*);
 int chdir(const char*);
 int dup(int);
 int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int wait2(int*, struct rusage*);
 
 // ulib.c
 int stat(const char*, struct stat*);

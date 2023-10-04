@@ -39,6 +39,19 @@ sys_wait(void)
 }
 
 uint64
+sys_wait2(void)
+{
+  uint64 p;
+  uint64 p1; //Pointer for second argument
+  
+  if(argaddr(0, &p) < 0)
+    return -1;
+  if(argaddr(1, &p1) < 0) //1 is in refrence to second argument ie rusage * we sent in
+    return -1;
+  return wait2(p,p1);
+}
+
+uint64
 sys_sbrk(void)
 {
   int addr;

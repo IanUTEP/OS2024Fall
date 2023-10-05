@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "pstat.h"
 #include "defs.h"
+#include "pstat.h"
 
 struct cpu cpus[NCPU];
 
@@ -106,7 +107,6 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
@@ -118,6 +118,7 @@ allocproc(void)
   return 0;
 
 found:
+  p->cputime = 0;
   p->pid = allocpid();
   p->state = USED;
 
@@ -408,6 +409,63 @@ wait(uint64 addr)
             release(&wait_lock);
             return -1;
           }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+    
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+int
+wait2(uint64 addr, uint64 addr1)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+  acquire(&wait_lock);
+  struct rusage cptime;
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+          
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+                                  sizeof(np->xstate)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          //Sets cputime from process so it can be copied into addr1 which
+          //Is a pointer we sent in from User land
+          cptime.cputime = np->cputime;
+          //IF use passes in a pointer copy out the values in the address
+          if(addr1 != 0 && copyout(p->pagetable, addr1, (char *)&cptime,
+                                  sizeof(cptime)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          
           freeproc(np);
           release(&np->lock);
           release(&wait_lock);

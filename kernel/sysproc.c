@@ -108,3 +108,15 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// return the number of active processes in the system
+// fill in user-provided data structure with pid,state,sz,ppid,name
+uint64
+sys_getprocs(void)
+{
+  uint64 addr;  // user pointer to struct pstat
+
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  return(procinfo(addr));
+}

@@ -4,8 +4,10 @@
 #include "riscv.h"
 #include "spinlock.h"
 #include "proc.h"
-#include "defs.h"
 #include "pstat.h"
+#include "defs.h"
+#include "syscall.h"
+#define MAXEFFPRIORITY 99
 
 struct cpu cpus[NCPU];
 
@@ -242,9 +244,8 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-
   p->state = RUNNABLE;
-
+  p->readytime = sys_uptime();
   release(&p->lock);
 }
 
@@ -314,6 +315,7 @@ fork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->readytime = sys_uptime();
   release(&np->lock);
 
   return pid;
@@ -492,17 +494,20 @@ wait2(uint64 addr, uint64 addr1)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+int min(int a, int b){
+return (a< b) ? a : b;
+}
 void
 scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
+  int val = 1;
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
+    if(val == 0){
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -519,8 +524,36 @@ scheduler(void)
       }
       release(&p->lock);
     }
+    }
+    
+    //Priority Schedu
+    else{
+    int topPrio = -1;
+    struct proc *tempP = proc;
+        for(p = proc; p < &proc[NPROC]; p++) {
+        int effective_priority = 0;
+        effective_priority = min(MAXEFFPRIORITY, p->priority + (sys_uptime() - p->readytime)); // Get Aging number
+        if(p->priority>topPrio && p->state == RUNNABLE){
+        	topPrio = p->priority;
+        	tempP = p;
+        }
+        p->priority = effective_priority; // Update Priority after checking current prio
+      	}
+              	acquire(&tempP->lock);
+      		//Add aging here
+        	// Switch to chosen process.  It is the process's job
+        	// to release its lock and then reacquire it
+        	// before jumping back to us.
+        	tempP->state = RUNNING;
+        	c->proc = tempP;
+        	swtch(&c->context, &tempP->context);
+        	// Process is done running for now.
+        	// It should have changed its p->state before coming back.
+        	c->proc = 0;
+      	release(&tempP->lock);
+      }
+    }
   }
-}
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -556,6 +589,7 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  p->readytime = sys_uptime();
   sched();
   release(&p->lock);
 }
@@ -624,6 +658,7 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+  	p->readytime = sys_uptime();
       }
       release(&p->lock);
     }
@@ -644,7 +679,8 @@ kill(int pid)
       p->killed = 1;
       if(p->state == SLEEPING){
         // Wake process from sleep().
-        p->state = RUNNABLE;
+  	p->state = RUNNABLE;
+  	p->readytime = sys_uptime();
       }
       release(&p->lock);
       return 0;
@@ -711,4 +747,66 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// Fill in user-provided array with info for current processes
+// Return the number of processes found
+int
+procinfo(uint64 addr)
+{
+  struct proc *p;
+  struct proc *thisproc = myproc();
+  struct pstat procinfo;
+  int nprocs = 0;
+  for(p = proc; p < &proc[NPROC]; p++){ 
+    if(p->state == UNUSED)
+      continue;
+    nprocs++;
+    procinfo.pid = p->pid;
+    procinfo.state = p->state;
+    procinfo.size = p->sz;
+    procinfo.priority = p->priority;
+    procinfo.readytime = p->readytime;
+    if (p->parent)
+      procinfo.ppid = (p->parent)->pid;
+    else
+      procinfo.ppid = 0;
+    for (int i=0; i<16; i++)
+      procinfo.name[i] = p->name[i];
+   if (copyout(thisproc->pagetable, addr, (char *)&procinfo, sizeof(procinfo)) < 0)
+      return -1;
+    addr += sizeof(procinfo);
+  }
+  return nprocs;
+}
+
+// Fill in user-provided array with info for current processes
+// Return the number of processes found
+int
+getpriority(uint64 addr)
+{
+  struct proc *thisproc = myproc();
+  struct ruprio priority;
+  int pid;
+  pid = thisproc->pid;
+  priority.priority = thisproc->priority;
+   if (addr != 0 && copyout(thisproc->pagetable, addr, (char *)&priority, sizeof(priority)) < 0){
+      return -1;
+  }
+  return pid;
+}
+
+int
+setpriority(uint64 addr)
+{
+  struct proc *thisproc = myproc();
+  int pid;
+  pid = thisproc->pid;
+  int *temp =0;
+   if (addr != 0){
+   //either_copyin(void *dst, int user_src, uint64 src, uint64 len)
+   either_copyin(temp,1,addr,8);
+   thisproc->priority = *temp;
+  }
+  return pid;
 }

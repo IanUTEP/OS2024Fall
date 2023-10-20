@@ -21,6 +21,7 @@ int link(const char*, const char*);
 int mkdir(const char*);
 int time1(const char*);
 int time(const char*);
+int pexec(const char*);
 int sleep(int);
 int matmul(const char*);
 int chdir(const char*);

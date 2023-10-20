@@ -130,6 +130,7 @@ UPROGS=\
 	$U/_sleep\
 	$U/_time\
 	$U/_time1\
+	$U/_pexec\
 	$U/_rm\
 	$U/_sh\
 	$U/_stressfs\

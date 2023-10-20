@@ -537,7 +537,7 @@ scheduler(void)
         	topPrio = p->priority;
         	tempP = p;
         }
-        p->priority = effective_priority; // Update Priority after checking current prio
+        p->priority = effective_priority;// Update Priority after checking current prio
       	}
               	acquire(&tempP->lock);
       		//Add aging here
@@ -545,6 +545,7 @@ scheduler(void)
         	// to release its lock and then reacquire it
         	// before jumping back to us.
         	tempP->state = RUNNING;
+        	tempP->priority = 0; // reset priority after time slice
         	c->proc = tempP;
         	swtch(&c->context, &tempP->context);
         	// Process is done running for now.

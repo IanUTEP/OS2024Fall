@@ -502,7 +502,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  int val = 1;
+  int val = 0;
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
@@ -525,34 +525,7 @@ scheduler(void)
       release(&p->lock);
     }
     }
-    
-    //Priority Schedu
-    else{
-    int topPrio = -1;
-    struct proc *tempP = proc;
-        for(p = proc; p < &proc[NPROC]; p++) {
-        int effective_priority = 0;
-        effective_priority = min(MAXEFFPRIORITY, p->priority + (sys_uptime() - p->readytime)); // Get Aging number
-        if(p->priority>topPrio && p->state == RUNNABLE){
-        	topPrio = p->priority;
-        	tempP = p;
-        }
-        p->priority = effective_priority;// Update Priority after checking current prio
-      	}
-              	acquire(&tempP->lock);
-      		//Add aging here
-        	// Switch to chosen process.  It is the process's job
-        	// to release its lock and then reacquire it
-        	// before jumping back to us.
-        	tempP->state = RUNNING;
-        	tempP->priority = 0; // reset priority after time slice
-        	c->proc = tempP;
-        	swtch(&c->context, &tempP->context);
-        	// Process is done running for now.
-        	// It should have changed its p->state before coming back.
-        	c->proc = 0;
-      	release(&tempP->lock);
-      }
+   
     }
   }
 
@@ -629,19 +602,16 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-
   acquire(&p->lock);  //DOC: sleeplock1
   release(lk);
-
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
 
   sched();
-
   // Tidy up.
   p->chan = 0;
-
+  
   // Reacquire original lock.
   release(&p->lock);
   acquire(lk);
@@ -810,4 +780,17 @@ setpriority(uint64 addr)
    thisproc->priority = *temp;
   }
   return pid;
+}
+
+// Fill in user-provided array with info for current processes
+// Return the number of processes found
+int
+freepmem(uint64 addr)
+{
+	struct proc *thisproc = myproc();
+  int freemem = freeMem() * PGSIZE;
+   if (addr != 0 && copyout(thisproc->pagetable, addr, (char *)&freemem, sizeof(freemem)) < 0){
+      return -1;
+  }
+  return freemem;
 }

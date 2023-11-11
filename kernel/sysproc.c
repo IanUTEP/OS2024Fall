@@ -57,7 +57,7 @@ sys_getpriority(void)
   uint64 p;
   if(argaddr(0, &p) < 0)
     return -1;
-  return wait(p);
+  return getpriority(p);
 }
 
 uint64
@@ -66,7 +66,16 @@ sys_setpriority(void)
   uint64 p;
   if(argaddr(0, &p) < 0)
     return -1;
-  return wait(p);
+  return setpriority(p);
+}
+
+uint64
+sys_freepmem(void)
+{
+  uint64 p;
+  if(argaddr(0, &p) < 0)
+    return -1;
+  return freepmem(p);
 }
 
 uint64
@@ -74,12 +83,11 @@ sys_sbrk(void)
 {
   int addr;
   int n;
-
+  int size = myproc()->sz;
   if(argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  addr = size;
+  myproc()->sz = size+n;
   return addr;
 }
 
@@ -91,12 +99,12 @@ sys_sleep(void)
 
   if(argint(0, &n) < 0)
     return -1;
-  acquire(&tickslock);
   ticks0 = ticks;
+  acquire(&tickslock);
   while(ticks - ticks0 < n){
     if(myproc()->killed){
       release(&tickslock);
-      return -1;
+     return -1;
     }
     sleep(&ticks, &tickslock);
   }

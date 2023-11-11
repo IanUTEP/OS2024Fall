@@ -24,3 +24,4 @@
 #define SYS_wait2  22
 #define SYS_getpriority  24
 #define SYS_setpriority  25
+#define SYS_freepmem 26

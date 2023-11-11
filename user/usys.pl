@@ -40,3 +40,4 @@ entry("getprocs");
 entry("wait2");
 entry("getpriority");
 entry("setpriority");
+entry("freepmem");

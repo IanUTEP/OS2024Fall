@@ -63,6 +63,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+int		freeMem(void);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -99,6 +100,9 @@ void            sched(void);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(uint64);
+int             setpriority(uint64);
+int             freepmem(uint64);
+int             getpriority(uint64);
 int             wait2(uint64,uint64);
 void            wakeup(void*);
 void            yield(void);
